@@ -1,0 +1,86 @@
+# ----------------------------------------------------------------
+# CONFIGURATION DU COMPOSANT CAROUSEL ET BROCHE INDEX
+# ----------------------------------------------------------------
+# pockets=12 : Nombre de positions
+# encoding=gray : L'encodeur Euchner envoie du Gray
+# num_is_and=0 : On utilise les bits de l'encodeur directement
+loadrt carousel pockets=12 encoding=gray
+loadrt orient names=orient.spindle
+loadrt pid names=pid.s,pid.spindle-pos
+
+addf hm2_7i96s.0.read          servo-thread
+addf carousel.0                servo-thread
+addf orient.spindle            servo-thread
+addf pid.s.do-pid-calcs        servo-thread
+addf pid.spindle-pos.do-pid-calcs servo-thread
+addf hm2_7i96s.0.write         servo-thread
+
+# ----------------------------------------------------------------
+# CONNEXION DES ENTRÉES DE L'ENCODEUR EUCHNER (GRAY)
+# ----------------------------------------------------------------
+# Note : Adaptez les numéros d'entrées "input-XX" selon votre câblage Mesa
+net car-bit0 hm2_7i96s.0.inm.00.input-00 => carousel.0.sense-0
+net car-bit1 hm2_7i96s.0.inm.00.input-01 => carousel.0.sense-1
+net car-bit2 hm2_7i96s.0.inm.00.input-02 => carousel.0.sense-2
+net car-bit3 hm2_7i96s.0.inm.00.input-03 => carousel.0.sense-3
+
+# ----------------------------------------------------------------
+# PARAMÈTRES DE RÉGLAGE DU MOUVEMENT
+# ----------------------------------------------------------------
+setp carousel.0.fwd-dc 0.2      # Temps de freinage (maintien moteur) en secondes
+setp carousel.0.rev-dc 0.2      # Idem pour le sens inverse
+setp carousel.0.linger 0.5      # Temps d'attente après verrouillage
+setp carousel.0.timeout 15      # Coupe tout si l'outil n'est pas trouvé en 15s
+
+# ----------------------------------------------------------------
+# LOGIQUE DU VÉRIN DE VERROUILLAGE (INDEXEUR)
+# ----------------------------------------------------------------
+# La broche 'unlock' passe à TRUE dès qu'un mouvement est requis.
+# Elle doit commander votre électrovanne via un relais.
+net car-verin-cmd carousel.0.unlock => [VOTRE_SORTIE_RELAIS_MESA_OU_BOB]
+
+# OPTIONNEL : Si vous avez un capteur "Vérin Rentré" (sécurité)
+# net car-is-unlocked [VOTRE_ENTREE_CAPTEUR_VERIN] => carousel.0.unlocked
+# Si pas de capteur, on peut simuler le retour immédiat ou utiliser un délai :
+setp carousel.0.unlocked 1 
+
+# ----------------------------------------------------------------
+# COMMANDE DU MOTEUR DC (DRIVER JZ-3615-A)
+# ----------------------------------------------------------------
+# motor-fwd active le sens horaire (IN1 du driver)
+# motor-rev active le sens anti-horaire (IN2 du driver)
+net car-motor-fwd carousel.0.motor-fwd => [VOTRE_SORTIE_P2_BOB]
+net car-motor-rev carousel.0.motor-rev => [VOTRE_SORTIE_P3_BOB]
+
+# -------------------------------------------------------------------
+# 2. ORIENTATION BROCHE (BT30 - SERVO 110AST)
+# -------------------------------------------------------------------
+
+# Configuration de l'encodeur de broche (Entrée Encoder Mesa)
+setp hm2_7i96s.0.encoder.00.scale 10000 # À ajuster selon votre driver
+net spindle-revs hm2_7i96s.0.encoder.00.position => spindle.0.revs
+net spindle-vel-fb hm2_7i96s.0.encoder.00.velocity => spindle.0.speed-in
+net spindle-index-enable hm2_7i96s.0.encoder.00.index-enable <=> spindle.0.index-enable
+
+# Logique M19 (Orient)
+net orient-en    motion.spindle-orient      => orient.spindle.enable
+net orient-angle motion.spindle-orient-angle => orient.spindle.angle
+net spindle-pos  hm2_7i96s.0.encoder.00.position => orient.spindle.position
+
+# Envoi de la commande de position au PID de broche
+net orient-cmd   orient.spindle.command     => pid.spindle-pos.command
+net orient-done  orient.spindle.is-oriented => motion.spindle-is-oriented
+
+# Sortie vers le driver de broche (Analogique 0-10V ou Step/Dir)
+# Ici en exemple vers la sortie 0-10V de la Mesa
+net spindle-out  pid.spindle-pos.output     => hm2_7i96s.0.pwmgen.00.value
+
+# ----------------------------------------------------------------
+# LIAISON AVEC L'INTERPRETEUR LINUXCNC (M6)
+# ----------------------------------------------------------------
+net tool-change iocontrol.0.tool-change => carousel.0.enable
+net tool-number iocontrol.0.tool-prep-number => carousel.0.pocket-number
+net tool-changed carousel.0.ready => iocontrol.0.tool-changed
+
+# Sécurité : Pas de rotation carrousel si la broche n'est pas orientée
+# (Optionnel : nécessite une porte AND en HAL)

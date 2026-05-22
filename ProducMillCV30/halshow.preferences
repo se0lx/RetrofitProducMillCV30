@@ -1,0 +1,120 @@
+# Halshow settings
+# This file is generated automatically.
+wm geometry . 700x804+194+27
+placeFrames 0.3
+set ::ratio 0.3
+set ::old_w_leftf 160
+set ::watchlist {
+    param+hm2_7i96s.0.watchdog.timeout_ns
+    pin+spindle.0.forward
+    pin+hm2_7i96s.0.watchdog.has_bit
+    pin+halui.spindle.0.runs-forward
+    pin+halui.spindle.0.runs-backward
+    pin+halui.spindle.0.forward
+    pin+hm2_7i96s.0.encoder.00.input-a
+    pin+hm2_7i96s.0.encoder.00.input-b
+    pin+hm2_7i96s.0.encoder.00.input-index
+    pin+hm2_7i96s.0.encoder.00.position
+    pin+hm2_7i96s.0.encoder.00.position-latched
+    pin+hm2_7i96s.0.encoder.00.quad-error
+    pin+hm2_7i96s.0.encoder.00.velocity
+    pin+hm2_7i96s.0.encoder.00.index-enable
+    pin+hm2_7i96s.0.encoder.00.count-latched
+    pin+hm2_7i96s.0.encoder.00.count
+    pin+hm2_7i96s.0.gpio.000.in
+    pin+hm2_7i96s.0.gpio.001.in
+    pin+hm2_7i96s.0.gpio.002.in
+    pin+hm2_7i96s.0.gpio.003.in
+    pin+hm2_7i96s.0.gpio.004.in
+    pin+hm2_7i96s.0.gpio.005.in
+    pin+hm2_7i96s.0.gpio.006.in
+    pin+hm2_7i96s.0.gpio.007.in
+    pin+hm2_7i96s.0.gpio.008.in
+    pin+hm2_7i96s.0.gpio.009.in
+    pin+hm2_7i96s.0.gpio.010.in
+    pin+hm2_7i96s.0.gpio.011.in
+    pin+hm2_7i96s.0.gpio.012.in
+    pin+hm2_7i96s.0.gpio.013.in
+    pin+hm2_7i96s.0.gpio.014.in
+    pin+hm2_7i96s.0.gpio.015.in
+    pin+hm2_7i96s.0.gpio.016.in
+    pin+hm2_7i96s.0.gpio.017.in
+    pin+hm2_7i96s.0.gpio.018.in
+    pin+hm2_7i96s.0.gpio.019.in
+    pin+hm2_7i96s.0.gpio.020.in
+    pin+hm2_7i96s.0.gpio.021.in
+    pin+hm2_7i96s.0.gpio.022.in
+    pin+hm2_7i96s.0.gpio.024.in
+    pin+hm2_7i96s.0.gpio.025.in
+    pin+hm2_7i96s.0.gpio.026.in
+    pin+hm2_7i96s.0.gpio.027.in
+    pin+hm2_7i96s.0.gpio.028.in
+    pin+hm2_7i96s.0.gpio.029.in
+    pin+hm2_7i96s.0.gpio.031.in
+    pin+hm2_7i96s.0.gpio.032.in
+    pin+hm2_7i96s.0.gpio.033.in
+    pin+hm2_7i96s.0.gpio.034.in
+    pin+hm2_7i96s.0.gpio.035.in
+    pin+hm2_7i96s.0.gpio.036.in
+    pin+hm2_7i96s.0.gpio.037.in
+    pin+hm2_7i96s.0.gpio.038.in
+    pin+hm2_7i96s.0.gpio.039.in
+    pin+hm2_7i96s.0.gpio.040.in
+    pin+hm2_7i96s.0.gpio.041.in
+    pin+hm2_7i96s.0.gpio.042.in
+    pin+hm2_7i96s.0.gpio.043.in
+    pin+hm2_7i96s.0.gpio.044.in
+    pin+hm2_7i96s.0.gpio.045.in
+    pin+hm2_7i96s.0.gpio.048.in
+    pin+hm2_7i96s.0.gpio.049.in
+    pin+hm2_7i96s.0.gpio.050.in
+    pin+hm2_7i96s.0.outm.00.invert-04
+    pin+hm2_7i96s.0.outm.00.invert-05
+    pin+hm2_7i96s.0.outm.00.out-04
+    pin+hm2_7i96s.0.outm.00.out-05
+    sig+home-x
+    sig+home-y
+    sig+home-z
+    pin+hm2_7i96s.0.inm.00.input-00
+    pin+hm2_7i96s.0.inm.00.input-01
+    pin+hm2_7i96s.0.inm.00.input-02
+    pin+hm2_7i96s.0.inm.00.input-03
+    pin+hm2_7i96s.0.inm.00.input-04
+    pin+hm2_7i96s.0.inm.00.input-05
+    pin+hm2_7i96s.0.inm.00.input-06
+    pin+hm2_7i96s.0.inm.00.input-07
+    pin+hm2_7i96s.0.inm.00.input-08
+    pin+hm2_7i96s.0.inm.00.input-09
+    pin+hm2_7i96s.0.inm.00.input-10
+    pin+hm2_7i96s.0.ssr.00.out-00
+    pin+hm2_7i96s.0.ssr.00.out-01
+    pin+hm2_7i96s.0.ssr.00.out-02
+    pin+hm2_7i96s.0.ssr.00.out-03
+    pin+hm2_7i96s.0.gpio.030.out
+    pin+hm2_7i96s.0.gpio.031.out
+    pin+hm2_7i96s.0.gpio.032.out
+    pin+hm2_7i96s.0.gpio.034.out
+    pin+hm2_7i96s.0.gpio.035.out
+    pin+hm2_7i96s.0.gpio.036.out
+    pin+hm2_7i96s.0.gpio.037.out
+    pin+hm2_7i96s.0.gpio.038.out
+    pin+hm2_7i96s.0.gpio.039.out
+    pin+hm2_7i96s.0.gpio.040.out
+    pin+hm2_7i96s.0.gpio.041.out
+    pin+hm2_7i96s.0.gpio.042.out
+    pin+hm2_7i96s.0.gpio.043.out
+    pin+hm2_7i96s.0.gpio.044.out
+    pin+hm2_7i96s.0.gpio.045.out
+    pin+hm2_7i96s.0.gpio.046.out
+    pin+hm2_7i96s.0.gpio.047.out
+    pin+hm2_7i96s.0.gpio.048.out
+    pin+hm2_7i96s.0.gpio.049.out
+    pin+hm2_7i96s.0.gpio.050.out
+}
+set ::workmode watchhal
+set ::watchInterval 100
+set ::col1_width 100
+set ::ffmts 
+set ::ifmts 
+set ::alwaysOnTop 1
+set ::autoSaveWatchlist 1

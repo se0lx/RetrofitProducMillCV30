@@ -1,0 +1,19 @@
+# Généré par PNCconf le Sat Apr  4 16:30:28 2026
+# Utilise la version LinuxCNC :  Master (2.9)
+# Si vous modifiez ce fichier, il sera
+# écrasé quand vous relancerez PNCconf
+
+#  ---manual tool change signals to gmoccapy's dialog---
+
+net tool-change-request    => gmoccapy.toolchange-change
+net tool-change-confirmed  <= gmoccapy.toolchange-changed
+net tool-number            => gmoccapy.toolchange-number
+
+#  ---signals to show tool offset in the GUI---
+
+net tooloffset-x  => gmoccapy.tooloffset-x
+net tooloffset-z  => gmoccapy.tooloffset-z
+
+#  ---spindle-at-speed indicator---
+
+net spindle-at-speed => gmoccapy.spindle_at_speed_led
