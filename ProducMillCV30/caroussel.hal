@@ -1,0 +1,91 @@
+# ----------------------------------------------------------------
+# CONFIGURATION DU COMPOSANT CAROUSEL ET BROCHE INDEX
+# ----------------------------------------------------------------
+# pockets=12 : Nombre de positions
+# encoding=gray : L'encodeur Euchner envoie du Gray
+# num_is_and=0 : On utilise les bits de l'encodeur directement
+# ----------------------------------------------------------------
+# CONFIGURATION GENERALE ET CHARGEMENT DES COMPOSANTS
+# ----------------------------------------------------------------
+loadrt carousel pockets=12 encoding=gray num_sense=7 dir=2
+
+
+
+# Ajout des fonctions au thread principal (carousel.0 a besoin d'un thread flottant)
+#addf hm2_7i96s.0.read             servo-thread
+addf or.motor_on                 servo-thread
+addf carousel.0                  servo-thread
+#addf orient.spindle              servo-thread
+#addf pid.spindle-pos             servo-thread
+#addf hm2_7i96s.0.write          servo-thread
+addf not.dir_inv                  servo-thread
+
+# ====================================================================
+# LECTURE DIRECTE DE L'ENCODEUR OMRON (7 BITS GRAY)
+# ====================================================================
+# Les pins physiques de la Mesa (bits) se connectent DIRECTEMENT aux pins sense-M (bits)
+net omron-g0        hm2_7i96s.0.inm.00.input-10 => carousel.0.sense-0
+net omron-g1        hm2_7i96s.0.inm.00.input-09 => carousel.0.sense-1
+net omron-g2        hm2_7i96s.0.inm.00.input-08 => carousel.0.sense-2
+net omron-g3        hm2_7i96s.0.inm.00.input-07 => carousel.0.sense-3
+net omron-g4        hm2_7i96s.0.inm.00.input-06 => carousel.0.sense-4
+net omron-g5        hm2_7i96s.0.inm.00.input-05 => carousel.0.sense-5
+net omron-g6        hm2_7i96s.0.inm.00.input-04 => carousel.0.sense-6
+
+# Filtrage du bruit sur les pistes de l'encodeur (Paramètre u32)
+setp carousel.0.debounce 5
+
+# ====================================================================
+# PARAMÈTRES DE RÉGLAGE DU COMPORTEMENT MOTEUR (FLOATS)
+# ====================================================================
+setp carousel.0.fwd-dc 0.3      # Vitesse/Duty-cycle en marche avant
+setp carousel.0.rev-dc 0.3      # Vitesse/Duty-cycle en marche arrière
+setp carousel.0.hold-dc 0.0     # Pas de maintien après l'arrêt
+setp carousel.0.rev-pulse 0.0   # Mettre une valeur en secondes si verrouillage en arrière
+
+# ----------------------------------------------------------------
+# LOGIQUE DU VÉRIN DE VERROUILLAGE (INDEXEUR)
+# ----------------------------------------------------------------
+# La broche 'unlock' passe à TRUE dès qu'un mouvement est requis.
+# Elle doit commander votre électrovanne via un relais.
+net car-verin-cmd       carousel.0.active => hm2_7i96s.0.gpio.036.out
+
+
+# ----------------------------------------------------------------
+# COMMANDE MOTEUR DC VIA DEUX RELAIS (ON/OFF + SENS)
+# ----------------------------------------------------------------
+# 1. Activation du Relais de puissance Marche/Arrêt (GPIO 047)
+# Le relais colle si le carrousel demande une rotation horaire OU anti-horaire
+net car-fwd-signal      carousel.0.motor-fwd => or.motor_on.in0
+net car-rev-signal      carousel.0.motor-rev => or.motor_on.in1
+net car-motor-power     or.motor_on.out => hm2_7i96s.0.gpio.038.out
+
+# 2. Activation du Relais Inverseur de Sens (GPIO 048)
+# Le relais reste au repos pour le sens FWD, et colle pour le sens REV
+net car-rev-signal      => hm2_7i96s.0.ssr.00.out-01
+
+
+# ----------------------------------------------------------------
+# LOGIQUE DES VÉRINS ET SÉCURITÉS (M64/M65/M66)
+# ----------------------------------------------------------------
+
+#  Vérin Tourelle (Avance/Recul)
+net car-move-cmd-out    motion.digital-out-03 => hm2_7i96s.0.gpio.042.out
+net car-move-cmd-in     motion.digital-out-02 => hm2_7i96s.0.gpio.043.out
+net car-at-spindle      hm2_7i96s.0.gpio.039.in  => motion.digital-in-00 # Capteur Tourelle OUVERT (15/44)
+net car-at-home         hm2_7i96s.0.gpio.041.in  => motion.digital-in-01 # Capteur Tourelle FERMÉ (29/44)
+
+#  Déblocage BT30 (Drawbar)
+net bt30-unlock-cmd     motion.digital-out-01 => hm2_7i96s.0.gpio.044.out
+net bt30-lock-cmd       motion.digital-out-00 => hm2_7i96s.0.gpio.045.out
+net bt30-is-locked      hm2_7i96s.0.gpio.037.in => motion.digital-in-02 # Capteur Serrage Outil
+
+# ----------------------------------------------------------------
+# LIAISON AVEC L'INTERPRETEUR LINUXCNC (M6)
+# ----------------------------------------------------------------
+net car-carousel-start   motion.digital-out-04 => carousel.0.enable
+net tool-number          iocontrol.0.tool-prep-number => carousel.0.pocket-number
+net carrousel-indexed    carousel.0.ready => motion.digital-in-04
+net spindle-oriented     spindle.0.is-oriented => motion.digital-in-05
+net tool-changed         carousel.0.ready => motion.digital-in-06
+

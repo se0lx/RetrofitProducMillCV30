@@ -1,0 +1,246 @@
+component cv30changer "ATC ProducMill CV30 - séquence M6 complète (13 étapes)";
+
+// ---- Entrées provenant de LinuxCNC / M6 ----
+pin in bit toolchange          "Signal M6 actif";
+pin in s32 reqtoolnumber       "Numéro d'outil demandé";
+pin in s32 currenttoolnumber   "Numéro d'outil courant";
+pin out bit toolchanged = false "Signal fin de changement d'outil vers iocontrol";
+
+// ---- Entrées capteurs machine ----
+pin in bit carrousel_out_sw    "Capteur carrousel sorti (gpio.039.in)";
+pin in bit carrousel_in_sw     "Capteur carrousel rentré (gpio.041.in)";
+pin in bit tool_unlocked_sw    "Capteur outil déverrouillé (gpio.037.in)";
+pin in bit tool_locked_sw      "Capteur outil verrouillé";
+pin in bit spindle_oriented    "Orientation broche terminée";
+pin in bit z_is_replace        "Z en position de remplacement atteinte";
+pin in bit z_is_20             "Z remonté de 20mm atteint";
+pin in bit z_is_safe           "Z safe atteint";
+pin in bit carrousel_indexed   "Nouvel outil aligné (index magasin OK)";
+pin in bit spindle_stopped     "Broche à l'arrêt confirmé";
+pin in bit estop_ok            "Chaîne sécurité OK";
+
+// ---- Sorties de commande vers HAL / Mesa ----
+pin out bit spindle_stop_cmd     = false "=> spindle.0.on inversé";
+pin out bit spindle_orient_cmd   = false "=> spindle.0.orient";
+pin out bit z_move_replace_cmd   = false "Demande mvt Z position remplacement";
+pin out bit z_move_20_cmd        = false "Demande mvt Z +20mm";
+pin out bit z_move_safe_cmd      = false "Demande mvt Z safe";
+pin out bit carrousel_out_cmd    = false "=> gpio.043.out";
+pin out bit carrousel_in_cmd     = false "=> gpio.042.out";
+pin out bit carrousel_rotate_cmd = false "=> ssr.01";
+pin out bit carrousel_dir_cmd    = false "=> ssr.02";
+pin out bit tool_unlock_cmd      = false "=> gpio.040.out";
+pin out bit tool_lock_cmd        = false "=> gpio.044.out";
+
+pin out s32 turretposition = 0  "Position courante du carrousel (debug)";
+pin out s32 progresslevel  = 0  "Étape en cours (0-12, 99=erreur)";
+
+param rw float timeout_s = 5.0  "Timeout générique par étape (s)";
+
+variable float timer = 0;
+
+option singleton yes;
+function _;
+author "seb@graban.ovh";
+license "GPL";
+;;
+
+FUNCTION(_)
+{
+    float period = fperiod;
+
+    if (!estop_ok) {
+        progresslevel = 99;
+        spindle_stop_cmd = true;
+        carrousel_out_cmd = false;
+        carrousel_in_cmd = false;
+        carrousel_rotate_cmd = false;
+        tool_unlock_cmd = false;
+        tool_lock_cmd = false;
+        return;
+    }
+
+    switch (progresslevel) {
+
+        case 0: // attente demande M6
+            toolchanged = 0;
+            if (toolchange && reqtoolnumber != currenttoolnumber
+                && reqtoolnumber > 0 && reqtoolnumber <= 12) {
+                progresslevel = 1;
+                timer = 0;
+            }
+            break;
+
+        // ---- (0) Arrêt broche ----
+        case 1:
+            spindle_stop_cmd = true;
+            if (spindle_stopped) {
+                progresslevel = 2;
+                timer = 0;
+            } else if ((timer += period) > timeout_s) {
+                progresslevel = 99;
+            }
+            break;
+
+        // ---- (1) Position Z de remplacement ----
+        case 2:
+            z_move_replace_cmd = true;
+            if (z_is_replace) {
+                z_move_replace_cmd = false;
+                progresslevel = 3;
+                timer = 0;
+            } else if ((timer += period) > timeout_s) {
+                progresslevel = 99;
+            }
+            break;
+
+        // ---- (2) Orientation broche ----
+        case 3:
+            spindle_orient_cmd = true;
+            if (spindle_oriented) {
+                progresslevel = 4;
+                timer = 0;
+            } else if ((timer += period) > timeout_s) {
+                progresslevel = 99;
+            }
+            break;
+
+        // ---- (3) Sortie carrousel ----
+        case 4:
+            carrousel_out_cmd = true;
+            if (carrousel_out_sw) {
+                progresslevel = 5;
+                timer = 0;
+            } else if ((timer += period) > timeout_s) {
+                progresslevel = 99;
+            }
+            break;
+
+        // ---- (4) Déverrouillage broche ----
+        case 5:
+            tool_unlock_cmd = true;
+            if (tool_unlocked_sw) {
+                progresslevel = 6;
+                timer = 0;
+            } else if ((timer += period) > timeout_s) {
+                progresslevel = 99;
+            }
+            break;
+
+        // ---- (5) Remontée Z 20mm ----
+        case 6:
+            z_move_20_cmd = true;
+            if (z_is_20) {
+                z_move_20_cmd = false;
+                progresslevel = 7;
+                timer = 0;
+            } else if ((timer += period) > timeout_s) {
+                progresslevel = 99;
+            }
+            break;
+
+        // ---- (6) Verrouillage broche ----
+        case 7:
+            tool_unlock_cmd = false;
+            tool_lock_cmd = true;
+            if (tool_locked_sw) {
+                progresslevel = 8;
+                timer = 0;
+            } else if ((timer += period) > timeout_s) {
+                progresslevel = 99;
+            }
+            break;
+
+        // ---- (7) Remontée Z safe ----
+        case 8:
+            z_move_safe_cmd = true;
+            if (z_is_safe) {
+                z_move_safe_cmd = false;
+                progresslevel = 9;
+                timer = 0;
+            } else if ((timer += period) > timeout_s) {
+                progresslevel = 99;
+            }
+            break;
+
+        // ---- (8) Rotation carrousel vers nouvel outil ----
+        case 9:
+            carrousel_rotate_cmd = true;
+            if (carrousel_indexed) {
+                carrousel_rotate_cmd = false;
+                turretposition = reqtoolnumber;
+                progresslevel = 10;
+                timer = 0;
+            } else if ((timer += period) > timeout_s) {
+                progresslevel = 99;
+            }
+            break;
+
+        // ---- (9) Déverrouillage broche ----
+        case 10:
+            tool_lock_cmd = false;
+            tool_unlock_cmd = true;
+            if (tool_unlocked_sw) {
+                progresslevel = 11;
+                timer = 0;
+            } else if ((timer += period) > timeout_s) {
+                progresslevel = 99;
+            }
+            break;
+
+        // ---- (10) Descente en position de changement ----
+        case 11:
+            z_move_replace_cmd = true;
+            if (z_is_replace) {
+                z_move_replace_cmd = false;
+                progresslevel = 12;
+                timer = 0;
+            } else if ((timer += period) > timeout_s) {
+                progresslevel = 99;
+            }
+            break;
+
+        // ---- (11) Verrouillage outil ----
+        case 12:
+            tool_unlock_cmd = false;
+            tool_lock_cmd = true;
+            if (tool_locked_sw) {
+                progresslevel = 13;
+                timer = 0;
+            } else if ((timer += period) > timeout_s) {
+                progresslevel = 99;
+            }
+            break;
+
+        // ---- (12) Rentrée carrousel ----
+        case 13:
+            carrousel_out_cmd = false;
+            carrousel_in_cmd = true;
+            if (carrousel_in_sw) {
+                carrousel_in_cmd = false;
+                tool_lock_cmd = false;
+                spindle_stop_cmd = false;
+                spindle_orient_cmd = false;
+                toolchanged = 1;
+                progresslevel = 0;
+                timer = 0;
+            } else if ((timer += period) > timeout_s) {
+                progresslevel = 99;
+            }
+            break;
+
+        case 99: // ERREUR
+            rtapi_print_msg(RTAPI_MSG_ERR,
+                "cv30changer: ERREUR etape bloquee - verifier capteurs");
+            carrousel_out_cmd = false;
+            carrousel_in_cmd = false;
+            carrousel_rotate_cmd = false;
+            tool_unlock_cmd = false;
+            tool_lock_cmd = false;
+            break;
+
+        default:
+            progresslevel = 99;
+            break;
+    }
+}

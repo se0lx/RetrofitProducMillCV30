@@ -1,0 +1,154 @@
+# ==========================================================
+# BROCHE 110ST-M06030 + T3D-L30A
+# Step/Dir : hm2_7i96s.0.stepgen.03
+# Encodeur : hm2_7i96s.0.encoder.00
+#
+# Orientation M19 avec le composant natif orient.spindle.
+# IMPORTANT : orient ne produit pas une vitesse. Il produit une
+# consigne de position pour un PID; pid.s.pos fournit donc la
+# vitesse de rattrapage vers le mux et le stepgen en mode vitesse.
+# ==========================================================
+
+# ==========================================================
+# 1. CONFIGURATION DU STEPGEN 03 (commande broche)
+# ==========================================================
+setp hm2_7i96s.0.stepgen.03.step_type          0
+setp hm2_7i96s.0.stepgen.03.control-type       1
+setp hm2_7i96s.0.stepgen.03.position-scale     [SPINDLE_0]STEP_SCALE
+setp hm2_7i96s.0.stepgen.03.maxvel             [SPINDLE_0]STEPGEN_MAXVEL
+setp hm2_7i96s.0.stepgen.03.maxaccel           [SPINDLE_0]STEPGEN_MAXACCEL
+setp hm2_7i96s.0.stepgen.03.steplen            [SPINDLE_0]STEPLEN
+setp hm2_7i96s.0.stepgen.03.stepspace          [SPINDLE_0]STEPSPACE
+setp hm2_7i96s.0.stepgen.03.dirsetup           [SPINDLE_0]DIRSETUP
+setp hm2_7i96s.0.stepgen.03.dirhold            [SPINDLE_0]DIRHOLD
+
+# ==========================================================
+# 2. CONFIGURATION DE L'ENCODEUR 00 (retour broche)
+# ==========================================================
+setp hm2_7i96s.0.encoder.00.scale               [SPINDLE_0]ENCODER_SCALE
+setp hm2_7i96s.0.encoder.00.counter-mode        0
+setp hm2_7i96s.0.encoder.00.filter              1
+setp hm2_7i96s.0.encoder.00.index-invert        0
+setp hm2_7i96s.0.encoder.00.index-mask          0
+setp hm2_7i96s.0.encoder.00.index-mask-invert   0
+setp hm2_7i96s.0.encoder.00.index-enable        1
+
+# ==========================================================
+# 3. RETOUR DE POSITION / VITESSE VERS LINUXCNC
+# ==========================================================
+net spindle-revs         hm2_7i96s.0.encoder.00.position   => spindle.0.revs
+net spindle-vel-fb-rps   hm2_7i96s.0.encoder.00.velocity   => spindle.0.speed-in
+net spindle-vel-fb-rpm   hm2_7i96s.0.encoder.00.velocity-rpm
+net spindle-index-enable hm2_7i96s.0.encoder.00.index-enable <=> spindle.0.index-enable
+
+# ==========================================================
+# 4. RAMPE VITESSE (M3/M4 uniquement)
+# ==========================================================
+# spindle-ramp est chargé et ajouté au servo-thread par
+# ProducMillCV30.hal. 4000 tr/min = 66.667 tr/s.
+# Avec maxv=66.667 et maxa=66.667, l'accélération de 0 à
+# 4000 tr/min prend environ 1 s (unités: tr/s et tr/s²).
+setp spindle-ramp.maxv     60
+setp spindle-ramp.maxa     60
+net spindle-vel-cmd-raw   spindle.0.speed-out-rps => spindle-ramp.in
+net spindle-vel-cmd-rps   spindle-ramp.out        => spindle-mux-vel.in0
+
+# ==========================================================
+# 5. ORIENTATION M19 (orient + PID associé)
+# ==========================================================
+# orient.spindle est chargé dans ProducMillCV30.hal.
+# L'ajout à servo-thread est nécessaire (il manque actuellement
+# dans ProducMillCV30.hal).
+# addf orient.spindle servo-thread
+# pid.s.pos est chargé dans ProducMillCV30.hal; il est le PID
+# de position associé au composant orient.
+# addf pid.s.pos.do-pid-calcs servo-thread
+
+# Interface native orient :
+#   position : encodeur en tours
+#   angle    : cible M19 en degrés
+#   mode     : 0 shortest, 1 CW, 2 CCW
+#   command  : consigne de position vers pid.s.pos.command
+#   is-oriented : acquittement vers motion
+net spindle-revs          => orient.spindle.position
+net spindle-orient-angle  spindle.0.orient-angle => orient.spindle.angle
+net spindle-orient-mode   spindle.0.orient-mode  => orient.spindle.mode
+# net spindle-orient-enable spindle.0.orient       => orient.spindle.enable => pid.s.pos.enable
+
+# Tolérance en degrés; ajouter ORIENT_ANGLE_TOLERANCE dans [SPINDLE_0].
+setp orient.spindle.tolerance [SPINDLE_0]ORIENT_ANGLE_TOLERANCE
+net spindle-is-oriented   orient.spindle.is-oriented => spindle.0.is-oriented
+
+# PID position orient : sortie en tr/s vers le mux.
+setp pid.s.pos.Pgain          [SPINDLE_0]P
+setp pid.s.pos.Igain          [SPINDLE_0]I
+setp pid.s.pos.Dgain          [SPINDLE_0]D
+setp pid.s.pos.FF0            [SPINDLE_0]FF0
+setp pid.s.pos.FF1            [SPINDLE_0]FF1
+setp pid.s.pos.FF2            [SPINDLE_0]FF2
+setp pid.s.pos.bias           [SPINDLE_0]BIAS
+setp pid.s.pos.deadband       [SPINDLE_0]DEADBAND
+setp pid.s.pos.maxoutput      [SPINDLE_0]MAX_OUTPUT
+net spindle-revs             => pid.s.pos.feedback
+net spindle-orient-command   orient.spindle.command => pid.s.pos.command
+net spindle-orient-vel       pid.s.pos.output      => spindle-mux-vel.in1
+
+# orient n'a ni offset, ni vel, ni fault, ni timeout en HAL.
+# orient-fault est une entrée motion (code défaut fourni par HAL).
+# Ne pas la relier à une sortie inexistante de orient.
+setp spindle.0.orient-fault 0
+
+# ==========================================================
+# 6. COMMUTATION VITESSE M3/M4 ↔ VITESSE DE RATTRAPAGE M19
+# ==========================================================
+# mux2 est chargé dans ProducMillCV30.hal.
+# sel=0 : rampe M3/M4; sel=1 : sortie pid.s.pos (M19).
+net spindle-stepgen-vel   spindle-mux-vel.out    => hm2_7i96s.0.stepgen.03.velocity-cmd
+
+# ==========================================================
+# 7. ENABLE STEPGEN ET BROCHE
+# ==========================================================
+# or2 spindle-or-enable est chargé dans ProducMillCV30.hal.
+# M3/M4 OU M19 active le stepgen.
+net spindle-on-m3m4       spindle.0.on           => spindle-or-enable.in0
+# M19 active l'orientation, le mux et le PID de position
+net spindle-on-m19        spindle.0.orient       => spindle-or-enable.in1
+net spindle-on-m19        => spindle-mux-vel.sel
+net spindle-on-m19        => orient.spindle.enable
+net spindle-on-m19        => pid.s.pos.enable
+net spindle-enable-out    spindle-or-enable.out 
+
+addf spindle-enable-delay servo-thread
+setp spindle-enable-delay.off-delay 2.5
+setp spindle-enable-delay.on-delay 0
+
+net spindle-enable-out => spindle-enable-delay.in
+net spindle-driver-enable spindle-enable-delay.out => hm2_7i96s.0.stepgen.03.enable
+
+# ==========================================================
+# 8. AT-SPEED (M3/M4; en M19, is-oriented est le verdict)
+# ==========================================================
+# near.0 est chargé et ajouté au servo-thread par ProducMillCV30.hal.
+setp near.0.scale        1.05
+setp near.0.difference   1.0
+net spindle-vel-cmd-rps  => near.0.in1
+net spindle-vel-fb-rps   => near.0.in2
+net spindle-at-speed     near.0.out => spindle.0.at-speed
+
+# ==========================================================
+# 9. DIAGNOSTIC (optionnel, à exécuter dans halcmd/halshow)
+# ==========================================================
+# show pin orient.spindle
+# show pin pid.s.pos
+# show pin spindle.0.orient
+# show pin spindle.0.orient-angle
+# show pin spindle.0.orient-mode
+# show pin spindle.0.is-oriented
+# show pin spindle.0.orient-fault
+# show sig spindle-revs
+# show sig spindle-mux-sel
+
+# ==========================================================
+# 10. SECURITE : ENABLE DRIVER T3D (optionnel)
+# ==========================================================
+#net spindle-drive-enable machine-is-enabled => hm2_7i96s.0.gpio.046.out

@@ -1,0 +1,134 @@
+O<M6_ATC> sub
+
+    ; ============================================================
+    ; M6 automatique ProducMill CV30
+    ; Séquence :
+    ;   0) Arrêt broche
+    ;   1) Position Z de remplacement
+    ;   2) Orientation broche
+    ;   3) Sortie carrousel
+    ;   4) Déverrouillage broche
+    ;   5) Remontée Z safe
+    ;   6) Changement outil / indexation carrousel
+    ;   7) Descente Z de prise
+    ;   8) Verrouillage broche
+    ;   9) Retrait carrousel
+    ;  10) Retour Z safe
+    ; ============================================================
+
+    ; --- 0) Préparation générale ---
+    M5
+    G90
+    G40 G49 G80
+
+    ; --- Sécurités de base ---
+    O<check_zsafe> if [#<_cv30_z_safe> EQ 0]
+        (abort, ERREUR : #<_cv30_z_safe> non défini ou nul)
+    O<check_zsafe> endif
+
+    O<check_zchange> if [#<_cv30_z_change> EQ 0]
+        (abort, ERREUR : #<_cv30_z_change> non défini ou nul)
+    O<check_zchange> endif
+
+    O<check_zdepose> if [#<_cv30_z_depose> EQ 0]
+        (abort, ERREUR : #<_cv30_z_depose> non défini ou nul)
+    O<check_zdepose> endif
+
+    O<check_zengage> if [#<_cv30_z_engage> EQ 0]
+        (abort, ERREUR : #<_cv30_z_engage> non défini ou nul)
+    O<check_zengage> endif
+
+    ; --- 1) Monter en Z safe ---
+    G53 G0 Z[#<_cv30_z_safe>]
+
+    ; --- 2) Aller à la position de changement ---
+    G53 G0 Z[#<_cv30_z_change>]
+
+    ; --- 3) Orienter la broche ---
+    M19 R0
+    M66 P5 L1 Q10
+    O100 if [#5399 EQ -1]
+        (abort, ERREUR : broche non orientée)
+    O100 endif
+
+    ; --- 4) Sortie carrousel vers la broche ---
+    M64 P0
+    M66 P0 L1 Q10
+    O110 if [#5399 EQ -1]
+        (abort, ERREUR : carrousel non sorti)
+    O110 endif
+    M65 P0
+
+    ; --- 5) Déverrouiller BT30 ---
+    M64 P2
+    M66 P2 L1 Q10
+    O120 if [#5399 EQ -1]
+        (abort, ERREUR : BT30 non déverrouillé)
+    O120 endif
+    M65 P2
+
+    ; --- 6) Déposer l'outil courant ---
+    G53 G0 Z[#<_cv30_z_depose>]
+
+    ; --- 7) Remonter en Z safe avant indexation ---
+    G53 G0 Z[#<_cv30_z_safe>]
+
+    ; --- 8) Indexer le carrousel sur le nouvel outil ---
+    M64 P4
+    M66 P4 L1 Q10
+    O130 if [#5399 EQ -1]
+        (abort, ERREUR : carrousel non indexé sur l'outil demandé)
+    O130 endif
+    M65 P4
+
+    ; --- 9) Attendre la fin de la séquence ATC ---
+    M66 P6 L1 Q10
+    O131 if [#5399 EQ -1]
+        (abort, ERREUR : séquence de changement d'outil non terminée)
+    O131 endif
+
+    ; --- 10) Descendre en position de prise ---
+    G53 G0 Z[#<_cv30_z_change>]
+
+    ; --- 11) Verrouillage BT30 ---
+    ; On referme la pince, puis on attend le retour de l'état "outil serré"
+    M65 P2
+    G4 P0.5
+    M64 P3
+    M66 P2 L3 Q10
+    O150 if [#5399 EQ -1]
+        (abort, ERREUR : nouvel outil non verrouillé dans la broche)
+    O150 endif
+    M65 P3
+
+    ; --- 12) Rentrée du carrousel ---
+    M64 P1
+    M66 P1 L1 Q10
+    O160 if [#5399 EQ -1]
+        (abort, ERREUR : carrousel non rentré)
+    O160 endif
+    M65 P1
+
+    ; --- 13) Validation finale par l'état outil serré ---
+    ; motion.digital-in-02 = 1 lorsque l’outil est bien serré
+    M66 P2 L3 Q10
+    O170 if [#5399 EQ -1]
+        (abort, ERREUR : validation finale impossible, outil non serré)
+    O170 endif
+
+    ; --- 14) Retour final en Z safe ---
+    G53 G0 Z[#<_cv30_z_safe>]
+
+    (print, Changement d'outil CV30 terminé avec succès)
+
+O<M6_ATC> endsub
+
+; ============================================
+; Paramètres machine CV30 (à adapter)
+; ============================================
+; Z machine pour position de remplacement (au niveau du cône carrousel)
+#<_cv30_z_engage> = 0.0     ; Exemple : Z0 machine pour échange (AJUSTER)
+#<_cv30_z_safe>    = 50.0    
+#<_cv30_z_depose>    = 10.0 
+#<_cv30_z_change>    = 60.0  
+
