@@ -102,11 +102,4 @@ La carte Mesa assure notamment :
 - l’interface avec les capteurs ;
 - la commande du magasin automatique.
 
-### Configuration LinuxCNC
-
-La configuration utilise actuellement :
-
-```ini
-[KINS]
-JOINTS = 3
-KINEMATICS = trivkins coordinates=XYZ
+trivkins coordinates=XYZ
