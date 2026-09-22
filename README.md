@@ -101,5 +101,3 @@ La carte Mesa assure notamment :
 - la gestion des encodeurs ;
 - l’interface avec les capteurs ;
 - la commande du magasin automatique.
-
-trivkins coordinates=XYZ
